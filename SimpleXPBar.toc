@@ -1,5 +1,6 @@
-## Interface-Mainline: 12001
-## Interface-Classic: 11505
+## Interface: 120001
+## Interface-Retail: 120001
+## Interface-Classic-Era: 11505
 ## Interface-BCC: 20504
 ## Title: SimpleXPBar
 ## Notes: XP Bar with Quest Completion Overlay

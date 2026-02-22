@@ -1,0 +1,9 @@
+## Interface: 20505
+## Title: SimpleXPBar
+## Notes: XP Bar with Quest Completion Overlay
+## Author: Gemini
+## Version: 1.3
+## SavedVariables: SimpleXPBarDB
+## OptionalDeps: LibStub, CallbackHandler-1.0, LibDataBroker-1.1, LibDBIcon-1.0
+
+core.lua

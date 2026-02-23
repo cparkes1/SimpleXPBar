@@ -2,8 +2,6 @@
 -- 1. Configuration & Constants
 -- ---------------------------------------------------------
 local ADDON_NAME = "SimpleXPBar"
-local MAX_LEVEL_RETAIL = 80 
-local MAX_LEVEL_TBC    = 70
 
 local DEFAULT_WIDTH, DEFAULT_HEIGHT = 600, 24
 local FONT_MAIN = [[Fonts\FRIZQT__.TTF]]
@@ -43,41 +41,46 @@ local function FormatTime(s)
     else return string.format("%dm %ds", s/60, s%60) end
 end
 
+local function GetCurrentMaxLevel()
+    local maxLevel = GetMaxPlayerLevel()
+    if not maxLevel or maxLevel <= 0 then
+        if IS_RETAIL then
+            maxLevel = 80 -- Current Retail (Update to 90 on Friday)
+        else
+            maxLevel = 70 -- Standard for TBC
+        end
+    end
+    
+    return maxLevel
+end
+
 local function IsMaxLevel()
-    return UnitLevel("player") >= (IS_RETAIL and MAX_LEVEL_RETAIL or MAX_LEVEL_TBC)
+    return UnitLevel("player") >= GetCurrentMaxLevel()
 end
 
 -- ---------------------------------------------------------
--- 4. Quest Logic (Scanner)
+-- 4. Quest Logic
 -- ---------------------------------------------------------
-local scanner = CreateFrame("GameTooltip", "SimpleXPScanner", nil, "GameTooltipTemplate")
-scanner:SetOwner(WorldFrame, "ANCHOR_NONE")
-
 local function UpdateQuestXP()
     totalQuestXP = 0
     wipe(cachedQuestData)
     
     if IS_RETAIL then
-        for i = 1, C_QuestLog.GetNumQuestLogEntries() do
+        -- Modern Retail (12.0+) Native Logic
+        local numEntries = C_QuestLog.GetNumQuestLogEntries()
+        for i = 1, numEntries do
             local info = C_QuestLog.GetInfo(i)
             if info and not info.isHeader and C_QuestLog.IsComplete(info.questID) then
-                scanner:ClearLines()
-                scanner:SetQuestLogItem("reward", 1, info.questLogIndex or i)
-                for j = 1, scanner:NumLines() do
-                    local text = _G["SimpleXPScannerTextLeft"..j]:GetText()
-                    if text then
-                        local amt = text:match("(%d+)%s+Experience") or text:match("Experience:%s+(%d+)")
-                        if amt then
-                            local xp = tonumber(amt) or 0
-                            totalQuestXP = totalQuestXP + xp
-                            table.insert(cachedQuestData, {title = info.title, xp = xp})
-                            break
-                        end
-                    end
+                local xp = GetQuestLogRewardXP(info.questID) or 0
+                
+                if xp > 0 then 
+                    totalQuestXP = totalQuestXP + xp 
+                    table.insert(cachedQuestData, {title = info.title, xp = xp})
                 end
             end
         end
     else
+        -- Classic / TBC logic (Remains stable)
         local oldSel = GetQuestLogSelection()
         for i = 1, GetNumQuestLogEntries() do
             local title, _, _, isHeader, _, isComp = GetQuestLogTitle(i)

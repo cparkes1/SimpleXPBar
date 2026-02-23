@@ -1,21 +1,81 @@
 -- ---------------------------------------------------------
--- 1. Configuration
+-- 1. Configuration & Main Frame
 -- ---------------------------------------------------------
 local ADDON_NAME = "SimpleXPBar"
 local MAX_LEVEL_RETAIL = 80 
 local MAX_LEVEL_TBC    = 70
 
--- Visuals
 local DEFAULT_WIDTH = 600 
 local DEFAULT_HEIGHT = 24
 local FONT_MAIN = "Fonts\\FRIZQT__.TTF"
 local TEXTURE = "Interface\\AddOns\\Details\\images\\bar_textures\\texture2020.tga"
 local ICON = "Interface\\AddOns\\SimpleXPBar\\icon.tga" 
 
--- Colors
 local COLOR_XP = {0.5, 0.2, 0.8, 1}
 local COLOR_QUEST = {1, 0.6, 0, 1}
 local COLOR_BG = {0, 0, 0, 0.6}
+
+local f = CreateFrame("Frame", ADDON_NAME, UIParent, "BackdropTemplate")
+f:SetSize(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+f:EnableMouse(true)
+f:SetMovable(true)
+f:SetResizable(true) 
+f:SetClampedToScreen(true)
+f:SetPoint("CENTER", nil, "CENTER", 0, -200)
+
+if f.SetResizeBounds then
+    f:SetResizeBounds(400, 15, 1200, 100) 
+else
+    f:SetMinResize(400, 15)
+end
+
+-- Create Background
+f.bg = f:CreateTexture(nil, "BACKGROUND")
+f.bg:SetAllPoints(true)
+f.bg:SetColorTexture(unpack(COLOR_BG))
+
+-- [[ FIX: CREATE THE BARS BEFORE THE LABELS ]]
+f.xpBar = CreateFrame("StatusBar", nil, f)
+f.xpBar:SetStatusBarTexture(TEXTURE)
+f.xpBar:SetAllPoints(f)
+f.xpBar:SetStatusBarColor(unpack(COLOR_XP))
+f.xpBar:SetFrameLevel(2)
+
+f.questBar = CreateFrame("StatusBar", nil, f)
+f.questBar:SetStatusBarTexture(TEXTURE)
+f.questBar:SetStatusBarColor(unpack(COLOR_QUEST))
+f.questBar:SetFrameLevel(1)
+f.questBar:SetPoint("TOPLEFT", f.xpBar:GetStatusBarTexture(), "TOPRIGHT", 0, 0)
+f.questBar:SetPoint("BOTTOMLEFT", f.xpBar:GetStatusBarTexture(), "BOTTOMRIGHT", 0, 0)
+
+local function CreateLabel(point, relPoint, x, y, size, justify)
+    local fs = f.xpBar:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    fs:SetFont(FONT_MAIN, size, "OUTLINE")
+    fs:SetPoint(point, f, relPoint, x, y)
+    if justify then fs:SetJustifyH(justify) end
+    return fs
+end
+
+f:RegisterForDrag("LeftButton")
+f:SetScript("OnDragStart", function(self)
+    if not IsControlKeyDown() then -- Move when NOT holding Ctrl (Ctrl is for resizing)
+        self:StartMoving()
+    end
+end)
+f:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    -- Save the new position to your database immediately
+    local point, _, relativePoint, xOfs, yOfs = self:GetPoint()
+    if SimpleXPBarDB then
+        SimpleXPBarDB.point = {point, nil, relativePoint, xOfs, yOfs}
+    end
+end)
+
+f.textCenter = CreateLabel("CENTER", "CENTER", 0, 1, 14)
+f.textTL = CreateLabel("BOTTOMLEFT", "TOPLEFT", 2, 4, 12, "LEFT")
+f.textTR = CreateLabel("BOTTOMRIGHT", "TOPRIGHT", -2, 4, 12, "RIGHT")
+f.textBL = CreateLabel("TOPLEFT", "BOTTOMLEFT", 2, -4, 12, "LEFT")
+f.textBR = CreateLabel("TOPRIGHT", "BOTTOMRIGHT", -2, -4, 12, "RIGHT")
 
 -- ---------------------------------------------------------
 -- 2. Version Detection & Setup
@@ -40,59 +100,42 @@ local levelTimeBase = 0
 local levelTimeReference = GetTime()
 local cachedQuestData = {} 
 local simpleXPLDB 
+local scannerTooltip = CreateFrame("GameTooltip", "SimpleXPScannerTooltip", nil, "GameTooltipTemplate")
+scannerTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
+local scannerTooltip = CreateFrame("GameTooltip", "SimpleXPScanner", nil, "GameTooltipTemplate")
+scannerTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
 
 -- ---------------------------------------------------------
--- 3. Main Frame & UI Setup
+-- 3. Resize Handle & Tooltip Logic
 -- ---------------------------------------------------------
-local f = CreateFrame("Frame", ADDON_NAME, UIParent, "BackdropTemplate")
-f:SetSize(DEFAULT_WIDTH, DEFAULT_HEIGHT)
-f:EnableMouse(true)
-f:SetMovable(true)
-f:SetResizable(true) 
-f:SetClampedToScreen(true)
-f:Hide() 
+f.resize = CreateFrame("Frame", nil, f)
+f.resize:SetSize(20, 20) 
+f.resize:SetPoint("BOTTOMRIGHT")
+f.resize:SetFrameLevel(10)
 
-if f.SetResizeBounds then f:SetResizeBounds(400, 15) else f:SetMinResize(400, 15) end
+f.resize.tex = f.resize:CreateTexture(nil, "OVERLAY")
+f.resize.tex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+f.resize.tex:SetAllPoints(true)
 
-f:RegisterForDrag("LeftButton")
-f:SetScript("OnDragStart", f.StartMoving)
-f:SetScript("OnDragStop", function(self)
-    self:StopMovingOrSizing()
-    local point, _, relativePoint, xOfs, yOfs = self:GetPoint()
-    SimpleXPBarDB.point = {point, nil, relativePoint, xOfs, yOfs}
+-- Scripts for Resizing
+f.resize:EnableMouse(true)
+f.resize:SetScript("OnMouseDown", function(self, button)
+    if button == "LeftButton" and IsControlKeyDown() then
+        f.isResizing = true
+        f:StartSizing("BOTTOMRIGHT")
+    end
 end)
 
-f.bg = f:CreateTexture(nil, "BACKGROUND")
-f.bg:SetAllPoints(true)
-f.bg:SetColorTexture(unpack(COLOR_BG))
-
-f.xpBar = CreateFrame("StatusBar", nil, f)
-f.xpBar:SetStatusBarTexture(TEXTURE)
-f.xpBar:SetAllPoints(f)
-f.xpBar:SetStatusBarColor(unpack(COLOR_XP))
-f.xpBar:SetFrameLevel(2)
-
-f.questBar = CreateFrame("StatusBar", nil, f)
-f.questBar:SetStatusBarTexture(TEXTURE)
-f.questBar:SetStatusBarColor(unpack(COLOR_QUEST))
-f.questBar:SetFrameLevel(1)
-f.questBar:SetPoint("TOPLEFT", f.xpBar:GetStatusBarTexture(), "TOPRIGHT", 0, 0)
-f.questBar:SetPoint("BOTTOMLEFT", f.xpBar:GetStatusBarTexture(), "BOTTOMRIGHT", 0, 0)
-
--- Text Labels
-local function CreateLabel(point, relPoint, x, y, size, justify)
-    local fs = f.xpBar:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    fs:SetFont(FONT_MAIN, size, "OUTLINE")
-    fs:SetPoint(point, f, relPoint, x, y)
-    if justify then fs:SetJustifyH(justify) end
-    return fs
-end
-
-f.textCenter = CreateLabel("CENTER", "CENTER", 0, 1, 14)
-f.textTL = CreateLabel("BOTTOMLEFT", "TOPLEFT", 2, 4, 12, "LEFT")
-f.textTR = CreateLabel("BOTTOMRIGHT", "TOPRIGHT", -2, 4, 12, "RIGHT")
-f.textBL = CreateLabel("TOPLEFT", "BOTTOMLEFT", 2, -4, 12, "LEFT")
-f.textBR = CreateLabel("TOPRIGHT", "BOTTOMRIGHT", -2, -4, 12, "RIGHT")
+f.resize:SetScript("OnMouseUp", function(self)
+    if f.isResizing then
+        f:StopMovingOrSizing()
+        f.isResizing = false
+        -- Save dimensions
+        SimpleXPBarDB.width = f:GetWidth()
+        SimpleXPBarDB.height = f:GetHeight()
+        if f.UpdateAll then f:UpdateAll() end
+    end
+end)
 
 -- ---------------------------------------------------------
 -- 4. Logic Functions
@@ -114,31 +157,56 @@ local function GetCompletedQuestXP()
     wipe(cachedQuestData) 
     
     if IS_RETAIL then
+        -- Modern Retail (12.0+) Tooltip Scanning
         local numEntries = C_QuestLog.GetNumQuestLogEntries()
         for i = 1, numEntries do
             local info = C_QuestLog.GetInfo(i)
             if info and not info.isHeader and C_QuestLog.IsComplete(info.questID) then
-                local xp = C_QuestLog.GetQuestRewardXP(info.questID)
-                if xp and xp > 0 then 
-                    totalXP = totalXP + xp 
-                    table.insert(cachedQuestData, {title=info.title, xp=xp})
+                local questXP = 0
+                
+                -- Clear and set the scanner to the quest log index
+                scannerTooltip:ClearLines()
+                scannerTooltip:SetQuestLogItem("reward", 1, info.questLogIndex or i)
+                
+                -- Read the text in the tooltip to find the XP amount
+                for j = 1, scannerTooltip:NumLines() do
+                    local line = _G["SimpleXPScannerTextLeft"..j]
+                    local text = line and line:GetText()
+                    if text then
+                        -- Matches numbers near the word "Experience"
+                        local amount = text:match("(%d?%d?%d?%d?%d?%d?%d?)%s+Experience") or 
+                                       text:match("Experience:%s+(%d?%d?%d?%d?%d?%d?%d?)")
+                        if amount then
+                            questXP = tonumber(amount) or 0
+                            break
+                        end
+                    end
+                end
+
+                if questXP > 0 then 
+                    totalXP = totalXP + questXP 
+                    table.insert(cachedQuestData, {title = info.title, xp = questXP})
                 end
             end
         end
     else
-        -- Classic / TBC logic
-        for i = 1, GetNumQuestLogEntries() do
-            local title, _, _, isHeader, _, isComplete, _, questID = GetQuestLogTitle(i)
+        -- Classic / TBC logic (remains unchanged)
+        local numEntries = GetNumQuestLogEntries()
+        local selectedIndex = GetQuestLogSelection() 
+        for i = 1, numEntries do
+            local title, _, _, isHeader, _, isComplete = GetQuestLogTitle(i)
             if not isHeader and isComplete then
                 SelectQuestLogEntry(i)
                 local xp = GetQuestLogRewardXP()
                 if xp and xp > 0 then 
                     totalXP = totalXP + xp 
-                    table.insert(cachedQuestData, {title=title, xp=xp})
+                    table.insert(cachedQuestData, {title = title, xp = xp})
                 end
             end
         end
+        if selectedIndex and selectedIndex > 0 then SelectQuestLogEntry(selectedIndex) end
     end
+    
     return totalXP
 end
 

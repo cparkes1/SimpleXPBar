@@ -178,11 +178,11 @@ function f:UpdateAll()
     local sessionTime = now - sessionStart
     local xpRate = (sessionTime > 0 and sessionXPGained > 0) and (sessionXPGained / sessionTime) or 0
     
-    f.textTL:SetText(string.format("Level: |cffFFFFFF%s|r", FormatTime(levelTimeBase + (now - levelTimeReference))))
-    f.textTR:SetText(string.format("Session: |cffFFFFFF%s|r", FormatTime(sessionTime)))
-    f.textCenter:SetText(string.format("Lvl %d   %s / %s   %.1f%% [+%.1f%%]", UnitLevel("player"), FormatNumber(cur), FormatNumber(max), (cur/max)*100, (totalQuestXP/max)*100))
-    f.textBL:SetText(string.format("Next: |cffFFFFFF%s|r (%s/Hr)", (xpRate > 0 and FormatTime((max - cur) / xpRate) or "N/A"), FormatNumber(xpRate * 3600)))
-    f.textBR:SetText(string.format("Quest: |cffFFA500%.1f%%|r - Rested: |cff0088FF%.1f%%|r", (totalQuestXP/max)*100, ((GetXPExhaustion() or 0)/max)*100))
+    f.textTL:SetText(string.format("Level Time: |cffFFFFFF%s|r", FormatTime(levelTimeBase + (now - levelTimeReference))))
+    f.textTR:SetText(string.format("Session Time: |cffFFFFFF%s|r", FormatTime(sessionTime)))
+    f.textCenter:SetText(string.format("Level %d   %s / %s   %.1f%% [+%.1f%%]", UnitLevel("player"), FormatNumber(cur), FormatNumber(max), (cur/max)*100, (totalQuestXP/max)*100))
+    f.textBL:SetText(string.format("Next Level: |cffFFFFFF%s|r (%s/Hr)", (xpRate > 0 and FormatTime((max - cur) / xpRate) or "N/A"), FormatNumber(xpRate * 3600)))
+    f.textBR:SetText(string.format("Quest XP: |cffFFA500%.1f%%|r - Rested XP: |cff0088FF%.1f%%|r", (totalQuestXP/max)*100, ((GetXPExhaustion() or 0)/max)*100))
 end
 
 -- ---------------------------------------------------------

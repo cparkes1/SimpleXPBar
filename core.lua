@@ -4,7 +4,7 @@
 local ADDON_NAME = "SimpleXPBar"
 
 local DEFAULT_WIDTH, DEFAULT_HEIGHT = 600, 24
-local FONT_MAIN = [[Fonts\FRIZQT__.TTF]]
+local FONT_MAIN = [[Interface\AddOns\SimpleXPBar\expressway_rg.ttf]]
 local TEXTURE = [[Interface\AddOns\Details\images\bar_textures\texture2020.tga]]
 local ICON = [[Interface\AddOns\SimpleXPBar\icon.tga]] 
 
@@ -54,8 +54,19 @@ local function GetCurrentMaxLevel()
     return maxLevel
 end
 
-local function IsMaxLevel()
-    return UnitLevel("player") >= GetCurrentMaxLevel()
+local function IsXPCapped()
+    if IsXPUserDisabled() then return true end
+    
+    local maxXP = UnitXPMax("player")
+    if maxXP <= 0 then return true end
+    
+    if UnitLevel("player") == 80 and not IsExpansionTrial() then
+        if GetExpansionLevel() < 11 then
+            return true
+        end
+    end
+
+    return false
 end
 
 -- ---------------------------------------------------------
@@ -165,7 +176,12 @@ end)
 -- 7. Update Core
 -- ---------------------------------------------------------
 function f:UpdateAll()
-    if IsMaxLevel() then f:Hide(); return end
+    if IsXPCapped() then 
+        f:Hide()
+        return 
+    else
+        f:Show() -- Ensure it shows up if it was previously hidden
+    end
     local cur, max = UnitXP("player"), UnitXPMax("player")
     if max <= 0 then return end
 
@@ -197,6 +213,7 @@ end)
 f:RegisterEvent("PLAYER_XP_UPDATE"); f:RegisterEvent("PLAYER_LEVEL_UP")
 f:RegisterEvent("PLAYER_ENTERING_WORLD"); f:RegisterEvent("TIME_PLAYED_MSG") 
 f:RegisterEvent("QUEST_LOG_UPDATE"); f:RegisterEvent("ADDON_LOADED")
+f:RegisterEvent("PLAYER_FLAGS_CHANGED")
 
 f:SetScript("OnEvent", function(self, event, arg1, arg2)
     if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
@@ -217,6 +234,7 @@ f:SetScript("OnEvent", function(self, event, arg1, arg2)
     elseif event == "QUEST_LOG_UPDATE" then UpdateQuestXP(); f:UpdateAll()
     elseif event == "PLAYER_LEVEL_UP" then
         if IsMaxLevel() then f:Hide(); SimpleXPBarDB.show = false else RequestTimePlayed(); f:UpdateAll() end
+        elseif event == "PLAYER_FLAGS_CHANGED" or event == "QUEST_LOG_UPDATE" then self:UpdateAll()
     end
     f.resize:SetShown(not SimpleXPBarDB.locked)
 end)
